@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 
 export function Layout() {
@@ -16,9 +16,12 @@ export function Layout() {
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-line bg-surface">
         <div className="mx-auto flex max-w-6xl items-center gap-5 px-6 py-3">
-          <span className="mr-3 font-serif text-lg font-semibold">
+          <Link
+            to="/"
+            className="mr-3 rounded-sm font-serif text-lg font-semibold transition hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+          >
             Career Intelligence
-          </span>
+          </Link>
 
           <NavLink to="/documents" className={linkClass}>
             Documents
