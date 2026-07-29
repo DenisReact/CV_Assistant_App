@@ -93,9 +93,13 @@ export function SessionsPage() {
               <select
                 value={resumeId}
                 onChange={(event) => setResumeId(event.target.value)}
-                className="w-full max-w-md rounded-sm border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-accent"
+                className={`w-full max-w-md rounded-sm border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-accent ${
+                  resumeId ? '' : 'text-muted'
+                }`}
               >
-                <option value="">Choose a resume…</option>
+                <option value="" disabled hidden>
+                  Choose a resume…
+                </option>
                 {resumes.map((resume) => (
                   <option key={resume.id} value={resume.id}>
                     {resume.title}

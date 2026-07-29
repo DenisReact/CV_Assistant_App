@@ -21,5 +21,36 @@ services:
       timeout: 5s
       retries: 10
 
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: cia-api
+    restart: unless-stopped
+    env_file:
+      - apps/api/.env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cia}:${POSTGRES_PASSWORD:-cia_local_dev}@db:5432/${POSTGRES_DB:-cia}?schema=public
+      PORT: 3000
+      CORS_ORIGINS: ${WEB_URL:-http://localhost:8080}
+    ports:
+      - '${API_PORT:-3000}:3000'
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_URL: ${API_URL:-http://localhost:3000}
+    container_name: cia-web
+    restart: unless-stopped
+    ports:
+      - '${WEB_PORT:-8080}:80'
+    depends_on:
+      - api
+
 volumes:
   db_data:
