@@ -113,7 +113,7 @@ Paragraph-first with sentence-level fallback ([chunking.service.ts](apps/api/src
 
 - **Conversational query rewrite.** Retrieval embeds the question alone, with no history attached - so "what about the second one?" embeds to noise. A cheap low-temperature LLM call first rewrites the follow-up into a standalone question; if the rewrite fails, the raw question is used rather than failing the request.
 - **Scoping to named jobs.** Every job posting in a session is semantically close to every other, so "how do I fit Job #1?" would happily retrieve chunks from Job #3. When a question names `Job #N`, retrieval is narrowed to those documents plus the resume; unnamed questions stay session-wide because cross-job comparison is a legitimate ask. The rewrite prompt is instructed to preserve `Job #N` labels verbatim so this works on follow-ups too.
-- **Top-K 8, relevance floor 0.35, context budget 6,000 tokens.** The floor is what enables honest "I don't know" answers; the budget keeps the prompt focused rather than stuffing everything retrieved into it.
+- **Top-K 8, relevance floor 0.35, context budget 6,000 tokens.** The budget keeps the prompt focused rather than stuffing everything retrieved into it. The floor is a cost guard on genuinely empty retrieval, and it fires rarely: measured against this corpus, an off-topic question ("what colour is my shirt?") still scores ~0.50 against a resume, while an on-topic one scores ~0.57. Gemini embeddings put unrelated English text at a high baseline, so an absolute cosine threshold is a blunt instrument for "is this on topic" - the margin is too narrow to threshold on without risking false refusals, which are a worse failure than a wasted call. Honest "I don't know" answers come from the prompt, not from this number.
 - **Labelled evidence, persisted citations.** Each context block is numbered and labelled in the user's own vocabulary ("Job #2 - «Senior Platform Engineer»"), and every assistant message stores its citations with rank and score, so the UI can show exactly which chunk backs which claim - and so retrieval quality can be audited after the fact.
 
 ### Prompt & context management
@@ -123,7 +123,7 @@ Prompts live in one reviewable file per feature ([chat/prompts.ts](apps/api/src/
 ### Guardrails
 
 - **Grounding rules in the system prompt**, tuned for this domain's specific failure: a career assistant that embellishes a resume is worse than one that says "I don't know", because the user may repeat the invention in an interview. Every claim must cite evidence; the model is told to distinguish "the resume does not mention X" from "the candidate lacks X".
-- **No-evidence short-circuit:** if nothing clears the relevance floor, a canned answer is returned _without calling the model at all_ - no evidence means a generation could only be invention, and it costs nothing this way.
+- **No-evidence short-circuit:** if retrieval comes back empty - no documents attached, or nothing above the floor - a canned answer is returned _without calling the model at all_, because with no evidence a generation could only be invention. In practice the empty-session case is what triggers this; see the floor's calibration above for why an off-topic question usually still clears it and is refused by the prompt instead.
 - **Low temperature** (0.2 for answers, 0.1 for scoring): creative variation reads as invented experience.
 - **Schema-constrained JSON** for the fit analysis (Gemini `responseSchema`) plus a server-side validator on the parsed result - the model cannot return a malformed or out-of-range breakdown into the database.
 - **Input hygiene:** global `ValidationPipe` with whitelisting, file-type and extracted-text checks (a scanned PDF with no text layer fails with an actionable message), env validation at bootstrap that names every bad variable at once. The frontend pre-checks extension and size so a wrong file fails instantly instead of after a 10 MB round trip; the server re-checks regardless.
@@ -263,7 +263,3 @@ Two different checks, at two different points in the pipeline.
 **At upload** — the extracted text is scored before anything is stored or embedded, so a file that is not what it claims to be never enters the index:
 
 ![Rejecting a document that is not a resume](docs/screenshots/guardrail-upload.png)
-
-**At query time** — a question the documents do not cover is refused rather than answered from the model's general knowledge. Nothing clears the relevance floor, so the model is never called at all:
-
-![Refusing to answer without evidence](docs/screenshots/guardrail-chat.png)
