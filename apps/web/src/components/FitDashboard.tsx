@@ -32,7 +32,11 @@ export function FitDashboard({
         </p>
         <div className="flex gap-2">
           {hasAnalyses && (
-            <Button variant="ghost" onClick={() => onRun(true)} disabled={running}>
+            <Button
+              variant="ghost"
+              onClick={() => onRun(true)}
+              disabled={running}
+            >
               Re-score
             </Button>
           )}
@@ -111,12 +115,31 @@ function JobCard({ job }: { job: SessionFit['jobs'][number] }) {
         ))}
       </div>
 
-      <button
-        onClick={() => setOpen((current) => !current)}
-        className="mt-4 text-sm font-medium text-accent"
-      >
-        {open ? 'Hide details' : 'Show details'}
-      </button>
+      <div className="mt-4">
+        <Button
+          variant="ghost"
+          onClick={() => setOpen((current) => !current)}
+          aria-expanded={open}
+        >
+          <span className="flex items-center gap-1.5">
+            {open ? 'Hide details' : 'Show details'}
+            <svg
+              viewBox="0 0 12 12"
+              aria-hidden="true"
+              className={`size-3 transition-transform ${open ? 'rotate-180' : ''}`}
+            >
+              <path
+                d="M2 4.5 6 8.5 10 4.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
+        </Button>
+      </div>
 
       {open && (
         <div className="mt-4 grid gap-6 border-t border-line pt-4 lg:grid-cols-2">
