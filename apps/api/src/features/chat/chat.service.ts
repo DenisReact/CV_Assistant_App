@@ -5,11 +5,9 @@ import {
   RetrievalService,
   type CitedChunk,
 } from 'src/rag/retrieval/retrieval.service';
-import {
-  SessionsService,
-  type SessionContext,
-} from '../sessions/sessions.service';
+import { SessionsService } from '../sessions/sessions.service';
 import { MessageRole } from '../../generated/prisma/enums';
+import { narrowToNamedJobs } from './narrow-to-named-jobs';
 import {
   ANSWER_SYSTEM_PROMPT,
   NO_DOCUMENTS_ANSWER,
@@ -105,19 +103,20 @@ export class ChatService {
     const session = await this.sessions.context(userId, sessionId);
     const labels = session.labels;
 
+    const priorTurns = await this.recentTurns(sessionId);
+
     await this.persistUserMessage(sessionId, question);
 
     if (session.documentIds.length === 0) {
       return this.persistAnswer(sessionId, NO_DOCUMENTS_ANSWER, [], labels);
     }
 
-    const priorTurns = await this.recentTurns(sessionId);
     const searchQuery = await this.standaloneQuestion(question, priorTurns);
 
     const { chunks, context } = await this.retrieval.retrieve({
       userId,
       query: searchQuery,
-      documentIds: this.narrowToNamedJobs(searchQuery, session),
+      documentIds: narrowToNamedJobs(searchQuery, session),
       labels,
     });
 
@@ -143,43 +142,6 @@ export class ChatService {
       completionTokens: result.completionTokens,
       latencyMs: result.latencyMs,
     });
-  }
-
-  /**
-   * When a question names specific jobs, search only those plus the resume.
-   *
-   * Without this, "how do I align with Job #1?" retrieves whatever is nearest in
-   * the whole session — and every job posting in a session is semantically close
-   * to every other, so an unrelated role lands in the context and spends tokens
-   * on evidence the answer must then ignore. The rewrite step is instructed to
-   * preserve "Job #N" labels verbatim, so this works on follow-ups too.
-   *
-   * A question that names nothing is left unscoped; comparing across all jobs is
-   * a legitimate thing to ask.
-   */
-  private narrowToNamedJobs(
-    question: string,
-    session: SessionContext,
-  ): string[] {
-    const named = new Set<string>();
-
-    for (const match of question.matchAll(/job\s*#?\s*(\d+)/gi)) {
-      const documentId = session.jobIdsByLabel.get(Number(match[1]));
-
-      if (documentId) {
-        named.add(documentId);
-      }
-    }
-
-    if (named.size === 0) {
-      return session.documentIds;
-    }
-
-    this.logger.debug(
-      `Scoped retrieval to ${named.size} named job(s) plus the resume`,
-    );
-
-    return session.resumeId ? [session.resumeId, ...named] : [...named];
   }
 
   private async standaloneQuestion(

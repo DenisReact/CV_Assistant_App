@@ -66,14 +66,12 @@ export class RetrievalService {
 
     const relevant = hits.filter((hit) => hit.score >= minScore);
 
-    if (relevant.length < hits.length) {
-      this.logger.debug(
-        `Dropped ${hits.length - relevant.length} of ${hits.length} hits below score ${minScore}`,
-      );
-    }
-
     const chunks = this.applyTokenBudget(relevant, maxContextTokens).map(
       (chunk, index) => ({ ...chunk, position: index + 1 }),
+    );
+
+    this.logger.log(
+      `retrieval k=${hits.length} kept=${chunks.length} top=${hits[0]?.score.toFixed(3) ?? 'n/a'} floor=${minScore}`,
     );
 
     return { chunks, context: this.buildContext(chunks, labels) };

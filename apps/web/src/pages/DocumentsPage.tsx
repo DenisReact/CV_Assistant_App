@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import type { DocumentKind, DocumentView } from '../lib/types';
+import { ACCEPT_ATTRIBUTE, validateUpload } from '../lib/files';
 import {
   useDeleteDocument,
   useDocuments,
@@ -8,15 +9,27 @@ import {
 } from '../lib/queries';
 import { Button, Card, Empty, ErrorNote, StatusBadge } from '../components/ui';
 
-const ACCEPT = '.pdf,.docx,.txt,.md';
-
 export function DocumentsPage() {
   const { data: documents = [], isLoading, error: loadError } = useDocuments();
   const upload = useUploadDocument();
   const remove = useDeleteDocument();
   const reprocess = useReprocessDocument();
 
-  const error = loadError ?? upload.error ?? remove.error ?? reprocess.error;
+  const [fileProblem, setFileProblem] = useState<string | null>(null);
+
+  const serverError =
+    loadError ?? upload.error ?? remove.error ?? reprocess.error;
+  const errorMessage = fileProblem ?? serverError?.message ?? null;
+
+  function handleFile(file: File, kind: DocumentKind) {
+    const problem = validateUpload(file);
+
+    setFileProblem(problem);
+
+    if (!problem) {
+      upload.mutate({ file, kind });
+    }
+  }
 
   const resumes = documents.filter((document) => document.kind === 'RESUME');
   const jobs = documents.filter(
@@ -33,7 +46,7 @@ export function DocumentsPage() {
         </p>
       </div>
 
-      {error && <ErrorNote>{error.message}</ErrorNote>}
+      {errorMessage && <ErrorNote>{errorMessage}</ErrorNote>}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <UploadBox
@@ -41,14 +54,14 @@ export function DocumentsPage() {
           title="Resume"
           hint="Your CV"
           disabled={upload.isPending}
-          onFile={(file, kind) => upload.mutate({ file, kind })}
+          onFile={handleFile}
         />
         <UploadBox
           kind="JOB_DESCRIPTION"
           title="Job description"
           hint="One posting per file"
           disabled={upload.isPending}
-          onFile={(file, kind) => upload.mutate({ file, kind })}
+          onFile={handleFile}
         />
       </div>
 
@@ -119,7 +132,7 @@ function UploadBox({
       <input
         ref={inputRef}
         type="file"
-        accept={ACCEPT}
+        accept={ACCEPT_ATTRIBUTE}
         className="hidden"
         onChange={(event) => {
           const file = event.target.files?.[0];
