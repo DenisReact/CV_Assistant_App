@@ -1,80 +1,64 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { api } from '../lib/api';
-import type { DocumentView, SessionView } from '../lib/types';
+import { useCreateSession, useDocuments, useSessions } from '../lib/queries';
 import { Button, Card, Empty, ErrorNote } from '../components/ui';
 
 export function SessionsPage() {
   const navigate = useNavigate();
-  const [sessions, setSessions] = useState<SessionView[]>([]);
-  const [documents, setDocuments] = useState<DocumentView[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const sessionsQuery = useSessions();
+  const documentsQuery = useDocuments();
+  const create = useCreateSession();
 
-  const [creating, setCreating] = useState(false);
   const [resumeId, setResumeId] = useState('');
   const [jobIds, setJobIds] = useState<string[]>([]);
   const [title, setTitle] = useState('');
 
-  useEffect(() => {
-    Promise.all([api.listSessions(), api.listDocuments()])
-      .then(([sessionList, documentList]) => {
-        setSessions(sessionList);
-        setDocuments(documentList);
-
-        // Pre-select the only resume when there is exactly one — the common
-        // case, and one less click.
-        const resumes = documentList.filter((d) => d.kind === 'RESUME');
-
-        if (resumes.length === 1) {
-          setResumeId(resumes[0].id);
-        }
-      })
-      .catch((cause: unknown) =>
-        setError(cause instanceof Error ? cause.message : 'Failed to load'),
-      )
-      .finally(() => setLoading(false));
-  }, []);
+  const sessions = sessionsQuery.data ?? [];
+  // Depend on query.data directly — it is referentially stable between
+  // renders, whereas `data ?? []` mints a fresh array and defeats the memo.
+  const documents = documentsQuery.data;
 
   const resumes = useMemo(
-    () => documents.filter((d) => d.kind === 'RESUME' && d.status === 'READY'),
+    () =>
+      (documents ?? []).filter(
+        (d) => d.kind === 'RESUME' && d.status === 'READY',
+      ),
     [documents],
   );
   const jobs = useMemo(
     () =>
-      documents.filter(
+      (documents ?? []).filter(
         (d) => d.kind === 'JOB_DESCRIPTION' && d.status === 'READY',
       ),
     [documents],
   );
 
+  useEffect(() => {
+    if (resumes.length === 1) {
+      setResumeId((current) => current || resumes[0].id);
+    }
+  }, [resumes]);
+
+  const error = sessionsQuery.error ?? documentsQuery.error ?? create.error;
+
   function toggleJob(id: string) {
     setJobIds((current) =>
-      current.includes(id)
-        ? current.filter((j) => j !== id)
-        : [...current, id],
+      current.includes(id) ? current.filter((j) => j !== id) : [...current, id],
     );
   }
 
-  async function create() {
-    setError(null);
-    setCreating(true);
-
-    try {
-      const session = await api.createSession({
+  function handleCreate() {
+    create.mutate(
+      {
         resumeId: resumeId || undefined,
         jobIds,
         title: title.trim() || undefined,
-      });
-
-      navigate(`/sessions/${session.id}`);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Failed to create');
-      setCreating(false);
-    }
+      },
+      { onSuccess: (session) => navigate(`/sessions/${session.id}`) },
+    );
   }
 
-  if (loading) {
+  if (sessionsQuery.isLoading || documentsQuery.isLoading) {
     return <Empty>Loading…</Empty>;
   }
 
@@ -88,7 +72,7 @@ export function SessionsPage() {
         </p>
       </div>
 
-      {error && <ErrorNote>{error}</ErrorNote>}
+      {error && <ErrorNote>{error.message}</ErrorNote>}
 
       <Card>
         <h2 className="font-medium">New comparison</h2>
@@ -109,7 +93,7 @@ export function SessionsPage() {
               <select
                 value={resumeId}
                 onChange={(event) => setResumeId(event.target.value)}
-                className="w-full max-w-md rounded-lg border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-accent"
+                className="w-full max-w-md rounded-sm border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-accent"
               >
                 <option value="">Choose a resume…</option>
                 {resumes.map((resume) => (
@@ -136,7 +120,7 @@ export function SessionsPage() {
                       key={job.id}
                       type="button"
                       onClick={() => toggleJob(job.id)}
-                      className={`rounded-lg border px-3 py-1.5 text-sm transition ${
+                      className={`rounded-sm border px-3 py-1.5 text-sm transition ${
                         selected
                           ? 'border-accent bg-accent-soft text-accent'
                           : 'border-line bg-surface text-muted hover:text-ink'
@@ -160,15 +144,15 @@ export function SessionsPage() {
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 placeholder="e.g. Berlin search, July"
-                className="w-full max-w-md rounded-lg border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-accent"
+                className="w-full max-w-md rounded-sm border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-accent"
               />
             </div>
 
             <Button
-              onClick={() => void create()}
-              disabled={creating || !resumeId || jobIds.length === 0}
+              onClick={handleCreate}
+              disabled={create.isPending || !resumeId || jobIds.length === 0}
             >
-              {creating ? 'Creating…' : 'Create comparison'}
+              {create.isPending ? 'Creating…' : 'Create comparison'}
             </Button>
           </div>
         )}

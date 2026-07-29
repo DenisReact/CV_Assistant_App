@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { validateEnv } from './config/env.validation';
 import { AuthModule } from './features/auth/auth.module';
 import { ChatModule } from './features/chat/chat.module';
@@ -35,6 +34,5 @@ import { UsersModule } from './features/users/users.module';
     FitModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
 })
 export class AppModule {}

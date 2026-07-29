@@ -1,46 +1,44 @@
 @import 'tailwindcss';
 
-/*
- * Design tokens rather than raw colours at call sites, so light and dark stay in
- * sync from one place. Tailwind v4 reads these from @theme and generates the
- * matching utilities — bg-surface, text-muted, border-line and so on.
- */
 @theme {
-  --color-canvas: #fbfbfd;
-  --color-surface: #ffffff;
-  --color-line: #e4e4e9;
-  --color-ink: #16161d;
-  --color-muted: #6b6b7b;
-  --color-accent: #6d3bff;
-  --color-accent-soft: #f1ebff;
+  --color-canvas: #f6f4ee;
+  --color-surface: #fffefa;
+  --color-line: #ddd8cb;
+  --color-ink: #211d17;
+  --color-muted: #6f695c;
+  --color-accent: #2d5f4b;
+  --color-accent-soft: #e6efe8;
 
-  --color-good: #16794a;
-  --color-good-soft: #e6f5ee;
-  --color-warn: #9a5b00;
-  --color-warn-soft: #fdf0dc;
-  --color-bad: #b3261e;
-  --color-bad-soft: #fdeceb;
+  --color-good: #2d5f4b;
+  --color-good-soft: #e6efe8;
+  --color-warn: #8a681c;
+  --color-warn-soft: #f3ead4;
+  --color-bad: #96372b;
+  --color-bad-soft: #f5e5e0;
 
-  --font-sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Segoe UI', system-ui, sans-serif;
+  --font-serif:
+    'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia,
+    'Times New Roman', serif;
   --font-mono: ui-monospace, Consolas, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
   @theme {
-    --color-canvas: #101014;
-    --color-surface: #17171d;
-    --color-line: #2b2b35;
-    --color-ink: #f2f2f5;
-    --color-muted: #9a9aab;
-    --color-accent: #a883ff;
-    --color-accent-soft: #241a3d;
+    --color-canvas: #161412;
+    --color-surface: #1e1b17;
+    --color-line: #37332b;
+    --color-ink: #eae5d9;
+    --color-muted: #9d9687;
+    --color-accent: #7cac92;
+    --color-accent-soft: #253229;
 
-    --color-good: #5fd4a0;
-    --color-good-soft: #14291f;
-    --color-warn: #e0a75a;
-    --color-warn-soft: #2b2013;
-    --color-bad: #f4877f;
-    --color-bad-soft: #2e1817;
+    --color-good: #7cac92;
+    --color-good-soft: #253229;
+    --color-warn: #c7a25a;
+    --color-warn-soft: #322a19;
+    --color-bad: #cd7d6c;
+    --color-bad-soft: #362019;
   }
 }
 
@@ -54,4 +52,14 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Page titles are serif; section micro-labels stay sans via their own classes. */
+h1 {
+  font-family: var(--font-serif);
+  letter-spacing: -0.01em;
+}
+
+::selection {
+  background: var(--color-accent-soft);
 }

@@ -4,16 +4,21 @@ import { useAuth } from '../lib/auth';
 export function Layout() {
   const { user, signOut } = useAuth();
 
+  // Underline navigation, not pills — the header should read like a masthead.
   const linkClass = ({ isActive }: { isActive: boolean }) =>
-    `rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-      isActive ? 'bg-accent-soft text-accent' : 'text-muted hover:text-ink'
+    `border-b-2 px-1 pt-0.5 pb-2 -mb-[13px] text-sm font-medium transition ${
+      isActive
+        ? 'border-accent text-ink'
+        : 'border-transparent text-muted hover:text-ink'
     }`;
 
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-10 border-b border-line bg-surface/85 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center gap-2 px-6 py-3">
-          <span className="mr-3 font-semibold">Career Intelligence</span>
+      <header className="sticky top-0 z-10 border-b border-line bg-surface">
+        <div className="mx-auto flex max-w-6xl items-center gap-5 px-6 py-3">
+          <span className="mr-3 font-serif text-lg font-semibold">
+            Career Intelligence
+          </span>
 
           <NavLink to="/documents" className={linkClass}>
             Documents

@@ -26,7 +26,7 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center p-6">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-sm rounded-2xl border border-line bg-surface p-8"
+        className="w-full max-w-sm rounded-sm border border-line bg-surface p-8"
       >
         <h1 className="text-xl font-semibold">Career Intelligence</h1>
         <p className="mt-1.5 text-sm text-muted">
@@ -48,7 +48,7 @@ export function LoginPage() {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           placeholder="you@example.com"
-          className="w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-accent"
+          className="w-full rounded-sm border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-accent"
         />
 
         <p className="mt-2 text-xs text-muted">

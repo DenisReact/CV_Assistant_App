@@ -70,7 +70,7 @@ function JobCard({ job }: { job: SessionFit['jobs'][number] }) {
       <Card>
         <div className="flex items-center justify-between">
           <div>
-            <span className="mr-2 text-xs font-semibold text-accent">
+            <span className="mr-2 font-mono text-[11px] font-semibold tracking-wider text-accent uppercase">
               {job.label}
             </span>
             <span className="font-medium">{job.title}</span>
@@ -92,7 +92,7 @@ function JobCard({ job }: { job: SessionFit['jobs'][number] }) {
 
         <div className="min-w-0 flex-1">
           <div>
-            <span className="mr-2 text-xs font-semibold text-accent">
+            <span className="mr-2 font-mono text-[11px] font-semibold tracking-wider text-accent uppercase">
               {job.label}
             </span>
             <span className="font-medium">{job.title}</span>

@@ -1,87 +1,22 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { api } from '../lib/api';
+import { useRef, useState } from 'react';
 import type { DocumentKind, DocumentView } from '../lib/types';
 import {
-  Button,
-  Card,
-  Empty,
-  ErrorNote,
-  StatusBadge,
-} from '../components/ui';
+  useDeleteDocument,
+  useDocuments,
+  useReprocessDocument,
+  useUploadDocument,
+} from '../lib/queries';
+import { Button, Card, Empty, ErrorNote, StatusBadge } from '../components/ui';
 
 const ACCEPT = '.pdf,.docx,.txt,.md';
 
-/** Ingestion is a few seconds of network work, so a short poll is enough. */
-const POLL_INTERVAL_MS = 2000;
-
 export function DocumentsPage() {
-  const [documents, setDocuments] = useState<DocumentView[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const { data: documents = [], isLoading, error: loadError } = useDocuments();
+  const upload = useUploadDocument();
+  const remove = useDeleteDocument();
+  const reprocess = useReprocessDocument();
 
-  const refresh = useCallback(async () => {
-    setDocuments(await api.listDocuments());
-  }, []);
-
-  useEffect(() => {
-    refresh()
-      .catch((cause: unknown) =>
-        setError(cause instanceof Error ? cause.message : 'Failed to load'),
-      )
-      .finally(() => setLoading(false));
-  }, [refresh]);
-
-  /*
-   * Upload returns 202 and indexes in the background, so the list has to be
-   * re-read until nothing is in flight. The interval is torn down as soon as
-   * everything settles rather than running for the life of the page.
-   */
-  const settling = documents.some(
-    (document) => document.status === 'PENDING' || document.status === 'PROCESSING',
-  );
-
-  useEffect(() => {
-    if (!settling) {
-      return;
-    }
-
-    const id = setInterval(() => void refresh(), POLL_INTERVAL_MS);
-
-    return () => clearInterval(id);
-  }, [settling, refresh]);
-
-  async function upload(file: File, kind: DocumentKind) {
-    setError(null);
-    setUploading(true);
-
-    try {
-      await api.uploadDocument(file, kind);
-      await refresh();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Upload failed');
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  async function remove(id: string) {
-    try {
-      await api.deleteDocument(id);
-      await refresh();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Delete failed');
-    }
-  }
-
-  async function reprocess(id: string) {
-    try {
-      await api.reprocessDocument(id);
-      await refresh();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Reprocess failed');
-    }
-  }
+  const error = loadError ?? upload.error ?? remove.error ?? reprocess.error;
 
   const resumes = documents.filter((document) => document.kind === 'RESUME');
   const jobs = documents.filter(
@@ -98,26 +33,26 @@ export function DocumentsPage() {
         </p>
       </div>
 
-      {error && <ErrorNote>{error}</ErrorNote>}
+      {error && <ErrorNote>{error.message}</ErrorNote>}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <UploadBox
           kind="RESUME"
           title="Resume"
           hint="Your CV"
-          disabled={uploading}
-          onFile={upload}
+          disabled={upload.isPending}
+          onFile={(file, kind) => upload.mutate({ file, kind })}
         />
         <UploadBox
           kind="JOB_DESCRIPTION"
           title="Job description"
           hint="One posting per file"
-          disabled={uploading}
-          onFile={upload}
+          disabled={upload.isPending}
+          onFile={(file, kind) => upload.mutate({ file, kind })}
         />
       </div>
 
-      {loading ? (
+      {isLoading ? (
         <Empty>Loading…</Empty>
       ) : documents.length === 0 ? (
         <Empty>Nothing uploaded yet.</Empty>
@@ -126,14 +61,14 @@ export function DocumentsPage() {
           <DocumentList
             heading="Resumes"
             documents={resumes}
-            onRemove={remove}
-            onReprocess={reprocess}
+            onRemove={(id) => remove.mutate(id)}
+            onReprocess={(id) => reprocess.mutate(id)}
           />
           <DocumentList
             heading="Job descriptions"
             documents={jobs}
-            onRemove={remove}
-            onReprocess={reprocess}
+            onRemove={(id) => remove.mutate(id)}
+            onReprocess={(id) => reprocess.mutate(id)}
           />
         </div>
       )}
@@ -174,7 +109,7 @@ function UploadBox({
           onFile(file, kind);
         }
       }}
-      className={`rounded-xl border-2 border-dashed p-6 text-center transition ${
+      className={`rounded-sm border-2 border-dashed p-6 text-center transition ${
         dragging ? 'border-accent bg-accent-soft' : 'border-line bg-surface'
       }`}
     >
@@ -248,7 +183,7 @@ function DocumentList({
               </div>
 
               {document.error && (
-                <p className="mt-3 rounded-lg bg-bad-soft px-3 py-2 text-xs text-bad">
+                <p className="mt-3 rounded-sm bg-bad-soft px-3 py-2 text-xs text-bad">
                   {document.error}
                 </p>
               )}

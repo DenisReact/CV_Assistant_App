@@ -1,32 +1,24 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import Markdown from 'react-markdown';
-import { api } from '../lib/api';
+import { useMessages, useSendMessage } from '../lib/queries';
 import type { Citation, MessageView } from '../lib/types';
 import { Button, Empty, ErrorNote } from './ui';
 
 export function Chat({ sessionId }: { sessionId: string }) {
-  const [messages, setMessages] = useState<MessageView[]>([]);
+  const { data: messages = [], isLoading, error: loadError } = useMessages(sessionId);
+  const send = useSendMessage(sessionId);
+
   const [draft, setDraft] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    api
-      .getMessages(sessionId)
-      .then(setMessages)
-      .catch((cause: unknown) =>
-        setError(cause instanceof Error ? cause.message : 'Failed to load'),
-      )
-      .finally(() => setLoading(false));
-  }, [sessionId]);
+  const busy = send.isPending;
+  const error = loadError ?? send.error;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, busy]);
 
-  async function send(event: FormEvent) {
+  function handleSend(event: FormEvent) {
     event.preventDefault();
 
     const content = draft.trim();
@@ -35,39 +27,14 @@ export function Chat({ sessionId }: { sessionId: string }) {
       return;
     }
 
-    setError(null);
-    setBusy(true);
     setDraft('');
-
-    const optimistic: MessageView = {
-      id: `local-${Date.now()}`,
-      role: 'USER',
-      content,
-      citations: [],
-      model: null,
-      promptTokens: null,
-      completionTokens: null,
-      latencyMs: null,
-      createdAt: new Date().toISOString(),
-    };
-
-    setMessages((current) => [...current, optimistic]);
-
-    try {
-      const answer = await api.sendMessage(sessionId, content);
-
-      setMessages((current) => [...current, answer]);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Request failed');
-    } finally {
-      setBusy(false);
-    }
+    send.mutate(content);
   }
 
   return (
     <div className="flex flex-col gap-4">
       <div className="space-y-4">
-        {loading ? (
+        {isLoading ? (
           <Empty>Loading…</Empty>
         ) : messages.length === 0 ? (
           <Empty>
@@ -91,14 +58,14 @@ export function Chat({ sessionId }: { sessionId: string }) {
         <div ref={bottomRef} />
       </div>
 
-      {error && <ErrorNote>{error}</ErrorNote>}
+      {error && <ErrorNote>{error.message}</ErrorNote>}
 
-      <form onSubmit={(event) => void send(event)} className="flex gap-2">
+      <form onSubmit={handleSend} className="flex gap-2">
         <input
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           placeholder="Ask about your fit…"
-          className="flex-1 rounded-lg border border-line bg-surface px-3.5 py-2.5 text-sm outline-none focus:border-accent"
+          className="flex-1 rounded-sm border border-line bg-surface px-3.5 py-2.5 text-sm outline-none focus:border-accent"
         />
         <Button type="submit" disabled={busy || draft.trim().length === 0}>
           Send
@@ -112,7 +79,7 @@ function MessageBubble({ message }: { message: MessageView }) {
   if (message.role === 'USER') {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-accent px-4 py-2.5 text-sm text-white">
+        <div className="max-w-[85%] rounded-sm bg-ink px-4 py-2.5 text-sm text-canvas">
           {message.content}
         </div>
       </div>
@@ -120,7 +87,11 @@ function MessageBubble({ message }: { message: MessageView }) {
   }
 
   return (
-    <div className="max-w-[95%] rounded-2xl rounded-bl-sm border border-line bg-surface px-4 py-3">
+    <div className="max-w-[95%] rounded-sm border border-line bg-surface px-4 py-3">
+      {/*
+       * The model writes citation markers like [2] inline; they correspond to
+       * the numbered list below the answer, same numbering both places.
+       */}
       <div className="prose-sm space-y-2 text-sm leading-relaxed [&_h3]:font-semibold [&_li]:ml-4 [&_li]:list-disc [&_strong]:font-semibold">
         <Markdown>{message.content}</Markdown>
       </div>
@@ -144,6 +115,8 @@ function MessageBubble({ message }: { message: MessageView }) {
 function CitationList({ citations }: { citations: Citation[] }) {
   const [openPosition, setOpenPosition] = useState<number | null>(null);
 
+  const open = citations.find((c) => c.position === openPosition);
+
   return (
     <div className="mt-3 border-t border-line pt-2.5">
       <p className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted uppercase">
@@ -159,7 +132,7 @@ function CitationList({ citations }: { citations: Citation[] }) {
                 current === citation.position ? null : citation.position,
               )
             }
-            className={`rounded-md border px-2 py-1 text-xs transition ${
+            className={`rounded-sm border px-2 py-1 text-xs transition ${
               openPosition === citation.position
                 ? 'border-accent bg-accent-soft text-accent'
                 : 'border-line text-muted hover:text-ink'
@@ -173,18 +146,14 @@ function CitationList({ citations }: { citations: Citation[] }) {
         ))}
       </div>
 
-      {openPosition !== null && (
-        <Excerpt
-          citation={citations.find((c) => c.position === openPosition)!}
-        />
-      )}
+      {open && <Excerpt citation={open} />}
     </div>
   );
 }
 
 function Excerpt({ citation }: { citation: Citation }) {
   return (
-    <blockquote className="mt-2 rounded-lg bg-canvas p-3 text-xs leading-relaxed text-muted">
+    <blockquote className="mt-2 rounded-sm bg-canvas p-3 text-xs leading-relaxed text-muted">
       <p className="mb-1 font-medium text-ink">
         {citation.label} — {citation.documentTitle} · chunk{' '}
         {citation.chunkIndex} · similarity {(citation.score * 100).toFixed(1)}%
