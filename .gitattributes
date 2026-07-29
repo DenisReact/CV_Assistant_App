@@ -1,0 +1,14 @@
+# Normalise line endings to LF in the repository, regardless of platform.
+* text=auto eol=lf
+
+# Binary assets — never touch.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.docx binary
+
+# Generated — collapse in diffs and exclude from language stats.
+pnpm-lock.yaml linguist-generated=true -diff
