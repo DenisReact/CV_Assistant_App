@@ -1,0 +1,27 @@
+Senior Platform Engineer — Fintech Scale-up (Remote, EU)
+
+ABOUT US
+Tidewave builds the payments backbone for European SMEs. We process card, SEPA and open-banking payments for 12,000 merchants and are doubling volume year over year. The platform team owns the transaction core that everything else stands on.
+
+THE ROLE
+You will own core transaction infrastructure end to end: design, build, operate. You will work directly with the CTO and two other senior engineers on the ledger, reconciliation, and payout systems.
+
+HARD REQUIREMENTS
+- 5+ years backend engineering in production payment or financial systems
+- Expert-level TypeScript and Node.js
+- Deep PostgreSQL knowledge, including transaction isolation levels and query optimisation
+- Experience designing idempotent, exactly-once payment flows
+- Comfortable owning on-call for critical infrastructure
+
+STRONGLY PREFERRED
+- Event-driven architecture with Kafka or similar
+- Infrastructure as code, ideally Terraform
+- Experience mentoring engineers
+
+NICE TO HAVE
+- Go
+- Exposure to PSD2 / SCA regulatory requirements
+- Kubernetes operations at scale
+
+WHAT WE OFFER
+EUR 95-120k, 0.1-0.3% equity, remote-first with quarterly on-sites in Amsterdam.

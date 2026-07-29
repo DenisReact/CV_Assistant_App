@@ -1,0 +1,26 @@
+Machine Learning Engineer — Computer Vision (Munich, On-site)
+
+ABOUT US
+Feldmark Robotics builds autonomous warehouse robots deployed in 30 fulfilment centres. The perception team makes them see.
+
+THE ROLE
+You will build and ship real-time object detection and tracking models that run on the robots themselves. Latency budgets are hard, hardware is constrained, and the environment is messy.
+
+HARD REQUIREMENTS
+- 4+ years applied machine learning with production model deployment
+- Expert Python, PyTorch and CUDA
+- Strong grounding in convolutional architectures and modern detection heads
+- Experience with model quantisation and inference optimisation on edge hardware
+- MSc or PhD in Computer Science, Robotics or a related field
+
+STRONGLY PREFERRED
+- ROS2
+- Sensor fusion across LiDAR and camera
+- Publications at CVPR, ICCV or ECCV
+
+NICE TO HAVE
+- C++ for real-time inference paths
+- NVIDIA Jetson deployment experience
+
+WHAT WE OFFER
+EUR 90-115k, relocation support to Munich, hardware budget.

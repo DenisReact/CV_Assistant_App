@@ -1,0 +1,26 @@
+Ada Okonkwo
+Senior Backend Engineer — Berlin, Germany
+ada.okonkwo@example.com
+
+SUMMARY
+Backend engineer with 8 years building payment and identity systems. Deep experience with Node.js, TypeScript and PostgreSQL. Led the migration of a monolithic billing service to event-driven microservices serving 40M requests per day.
+
+EXPERIENCE
+
+Staff Engineer, Nordwind Payments (2021 - present)
+Owned the ledger service handling EUR 2B in annual transaction volume. Rewrote the double-entry accounting core in TypeScript, cutting month-end reconciliation from 9 hours to 12 minutes. Introduced idempotency keys across all payment endpoints, eliminating duplicate-charge incidents entirely. Mentored four engineers, two promoted to senior. Ran the on-call rotation and cut page volume 60% by fixing the top three alert sources.
+
+Senior Backend Engineer, Kestrel Identity (2018 - 2021)
+Built OAuth2 and OIDC provider used by 300 enterprise customers. Implemented SCIM provisioning and SAML federation. Designed the multi-tenant data model with row-level security in PostgreSQL. Reduced p99 token issuance latency from 800ms to 45ms through connection pooling and query rewriting.
+
+Backend Engineer, Halcyon Logistics (2016 - 2018)
+Maintained a Django fleet-tracking service. Wrote the route optimisation batch job in Python. First exposure to PostgreSQL query tuning and PostGIS.
+
+SKILLS
+Languages: TypeScript, JavaScript, Python, SQL, some Go
+Datastores: PostgreSQL, Redis, Kafka, Elasticsearch
+Infrastructure: Docker, Terraform, GitHub Actions, AWS (ECS, RDS, S3, Lambda)
+Practices: Event-driven architecture, domain-driven design, trunk-based development, contract testing
+
+EDUCATION
+BSc Computer Science, University of Lagos, 2016

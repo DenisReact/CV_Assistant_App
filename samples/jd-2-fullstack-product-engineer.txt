@@ -1,0 +1,27 @@
+Full-Stack Product Engineer — B2B SaaS (Hybrid, Berlin)
+
+ABOUT US
+Lumenfeld makes procurement software for mid-size manufacturers. Small product-led team, 40 people total, engineering owns features from database to pixel.
+
+THE ROLE
+You will ship customer-facing features across the whole stack: React frontends, Node.js APIs, PostgreSQL underneath. You will talk to customers, shape the roadmap, and own what you build in production.
+
+HARD REQUIREMENTS
+- 4+ years full-stack development in production
+- Strong React and modern TypeScript
+- Solid Node.js API design (REST, ideally also GraphQL)
+- Relational database fundamentals — we use PostgreSQL
+- Product mindset: comfortable with ambiguous specs and direct customer contact
+
+STRONGLY PREFERRED
+- Experience in B2B SaaS
+- CI/CD ownership (we use GitHub Actions)
+- Testing culture: unit, integration and end-to-end
+
+NICE TO HAVE
+- Next.js or Remix
+- Design-system experience
+- German language skills
+
+WHAT WE OFFER
+EUR 75-95k, hybrid (2 days in the Berlin office), 30 vacation days.

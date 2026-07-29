@@ -1,0 +1,27 @@
+Site Reliability Engineer — E-commerce Platform (Remote, EU)
+
+ABOUT US
+Bricabrac runs marketplace infrastructure for 900 independent retailers across Europe. Black Friday traffic is 40x baseline; keeping the platform up through it is the job.
+
+THE ROLE
+You will join a four-person SRE team that owns availability, observability and infrastructure automation for a Kubernetes-based platform on AWS. You will set SLOs with product teams, run incident response, and automate away toil.
+
+HARD REQUIREMENTS
+- 4+ years operating production systems at scale
+- Kubernetes administration in production (we run EKS)
+- Infrastructure as code with Terraform
+- Strong observability practice: Prometheus, Grafana, distributed tracing
+- Incident management experience — running on-call, writing post-mortems
+
+STRONGLY PREFERRED
+- Go or Python for tooling and automation
+- AWS networking and cost optimisation
+- Database reliability work (we run PostgreSQL and Redis)
+
+NICE TO HAVE
+- Service mesh (Istio or Linkerd)
+- Chaos engineering experience
+- CKA or CKS certification
+
+WHAT WE OFFER
+EUR 85-105k, fully remote, dedicated 10% time for open-source and learning.
