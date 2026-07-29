@@ -111,11 +111,12 @@ export class GeminiEmbeddingsService extends EmbeddingsService {
     taskType: string,
   ): Promise<number[][]> {
     const response = await withRetry(
-      () =>
+      (signal) =>
         this.client.models.embedContent({
           model: this.model,
           contents: batch,
           config: {
+            abortSignal: signal,
             taskType,
             outputDimensionality: EMBEDDING_DIMENSIONS,
           },

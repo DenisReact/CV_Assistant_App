@@ -8,6 +8,7 @@ import {
 import { SessionsService } from '../sessions/sessions.service';
 import { MessageRole } from '../../generated/prisma/enums';
 import { narrowToNamedJobs } from './narrow-to-named-jobs';
+import { needsRewrite } from './needs-rewrite';
 import {
   ANSWER_SYSTEM_PROMPT,
   NO_DOCUMENTS_ANSWER,
@@ -122,12 +123,18 @@ export class ChatService {
    * be invention — and this way it costs nothing. Both are recorded as real
    * messages with no citations, which keeps the transcript honest about what
    * was asked and what came back.
+   *
+   * Latency is measured across the whole method, not around the generation
+   * call, so what is stored and shown is what the user actually waited for —
+   * rewrite, embedding and database work included.
    */
   async ask(
     userId: string,
     sessionId: string,
     question: string,
   ): Promise<MessageView> {
+    const started = Date.now();
+
     const session = await this.sessions.context(userId, sessionId);
     const labels = session.labels;
 
@@ -168,7 +175,7 @@ export class ChatService {
       model: result.model,
       promptTokens: result.promptTokens,
       completionTokens: result.completionTokens,
-      latencyMs: result.latencyMs,
+      latencyMs: Date.now() - started,
     });
   }
 
@@ -183,12 +190,15 @@ export class ChatService {
    * request. Searching with "what about the second one?" retrieves poorly, but
    * an error page for a question the user can see is answerable is worse — and
    * this is an auxiliary call, not the one they asked for.
+   *
+   * Skipped entirely when the question has nothing to resolve, because this
+   * costs a generation every time it runs. See {@link needsRewrite}.
    */
   private async standaloneQuestion(
     question: string,
     priorTurns: LlmTurn[],
   ): Promise<string> {
-    if (priorTurns.length === 0) {
+    if (!needsRewrite(question, priorTurns.length)) {
       return question;
     }
 

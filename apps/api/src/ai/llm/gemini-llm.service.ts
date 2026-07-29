@@ -107,7 +107,7 @@ export class GeminiLlmService extends LlmService {
     const started = Date.now();
 
     const response = await withRetry(
-      () =>
+      (signal) =>
         this.client.models.generateContent({
           model: this.model,
           // Gemini calls the assistant role "model"; the rest of the app uses
@@ -117,6 +117,7 @@ export class GeminiLlmService extends LlmService {
             parts: [{ text: turn.content }],
           })),
           config: {
+            abortSignal: signal,
             systemInstruction: options.system,
             // Low by default: this app answers from retrieved evidence, and
             // creative variation reads as the model inventing experience.

@@ -245,6 +245,11 @@ model Message {
   /// become queryable per session and per user, which is what per-user budgets
   /// and quotas would later be enforced against.
   ///
+  /// `latencyMs` is the end-to-end time to produce the answer - rewrite,
+  /// embedding, search and generation - not the generation call alone. The
+  /// narrower number under-reports what the user waited for, sometimes by an
+  /// order of magnitude when an upstream call stalls.
+  ///
   /// Null across all four for user messages and for the canned answers returned
   /// without calling the model — a null `model` means no generation happened,
   /// which is a meaningfully different thing from zero tokens.
