@@ -53,7 +53,9 @@ export class DocumentsController {
     @Body() dto: UploadDocumentDto,
   ): Promise<DocumentView> {
     if (!file) {
-      throw new BadRequestException('A file is required under the "file" field');
+      throw new BadRequestException(
+        'A file is required under the "file" field',
+      );
     }
 
     const document = await this.documents.upload(
@@ -71,10 +73,7 @@ export class DocumentsController {
     @CurrentUser() user: RequestUser,
     @Query('kind') kind?: string,
   ): Promise<DocumentView[]> {
-    const documents = await this.documents.list(
-      user.id,
-      this.parseKind(kind),
-    );
+    const documents = await this.documents.list(user.id, this.parseKind(kind));
 
     return documents.map((document) => this.toView(document));
   }
