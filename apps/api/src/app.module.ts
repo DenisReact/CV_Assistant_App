@@ -3,17 +3,17 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { validateEnv } from './config/env.validation';
-import { AuthModule } from './auth/auth.module';
-import { ChatModule } from './chat/chat.module';
-import { DocumentsModule } from './documents/documents.module';
-import { EmbeddingsModule } from './embeddings/embeddings.module';
-import { FitModule } from './fit/fit.module';
-import { IngestionModule } from './ingestion/ingestion.module';
-import { LlmModule } from './llm/llm.module';
+import { AuthModule } from './features/auth/auth.module';
+import { ChatModule } from './features/chat/chat.module';
+import { DocumentsModule } from './features/documents/documents.module';
+import { EmbeddingsModule } from './ai/embeddings/embeddings.module';
+import { FitModule } from './features/fit/fit.module';
+import { IngestionModule } from './rag/ingestion/ingestion.module';
+import { LlmModule } from './ai/llm/llm.module';
 import { PrismaModule } from './prisma/prisma.module';
-import { RetrievalModule } from './retrieval/retrieval.module';
-import { SessionsModule } from './sessions/sessions.module';
-import { UsersModule } from './users/users.module';
+import { RetrievalModule } from './rag/retrieval/retrieval.module';
+import { SessionsModule } from './features/sessions/sessions.module';
+import { UsersModule } from './features/users/users.module';
 
 @Module({
   imports: [

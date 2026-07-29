@@ -1,5 +1,5 @@
 import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
-import { DocumentKind } from '../../generated/prisma/enums';
+import { DocumentKind } from 'src/generated/prisma/enums';
 
 export class UploadDocumentDto {
   @IsEnum(DocumentKind, {

@@ -18,8 +18,8 @@ import { CurrentUser, type RequestUser } from '../auth/current-user';
 import { UserContextGuard } from '../auth/user-context.guard';
 import { DocumentsService } from './documents.service';
 import { UploadDocumentDto } from './dto/upload-document.dto';
-import { DocumentKind } from '../generated/prisma/enums';
-import type { Document } from '../generated/prisma/client';
+import { DocumentKind } from '../../generated/prisma/enums';
+import type { Document } from '../../generated/prisma/client';
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 

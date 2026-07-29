@@ -4,8 +4,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { DocumentKind } from '../generated/prisma/enums';
+import { PrismaService } from '../../prisma/prisma.service';
+import { DocumentKind } from '../../generated/prisma/enums';
 
 export interface SessionJobView {
   documentId: string;

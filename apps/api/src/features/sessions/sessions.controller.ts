@@ -17,7 +17,10 @@ import {
   CreateSessionDto,
   UpdateSessionDto,
 } from './dto/session.dto';
-import { SessionsService, type SessionView } from './sessions.service';
+import {
+  SessionsService,
+  type SessionView,
+} from 'src/features/sessions/sessions.service';
 
 @Controller('sessions')
 @UseGuards(UserContextGuard)

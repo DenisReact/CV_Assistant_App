@@ -1,22 +1,22 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { LlmService, type LlmTurn } from '../llm/llm.service';
+import { PrismaService } from '../../prisma/prisma.service';
+import { LlmService, type LlmTurn } from 'src/ai/llm/llm.service';
 import {
   RetrievalService,
   type CitedChunk,
-} from '../retrieval/retrieval.service';
+} from 'src/rag/retrieval/retrieval.service';
 import {
   SessionsService,
   type SessionContext,
 } from '../sessions/sessions.service';
-import { MessageRole } from '../generated/prisma/enums';
+import { MessageRole } from '../../generated/prisma/enums';
 import {
   ANSWER_SYSTEM_PROMPT,
   NO_DOCUMENTS_ANSWER,
   NO_EVIDENCE_ANSWER,
   REWRITE_SYSTEM_PROMPT,
   buildAnswerPrompt,
-} from './prompts';
+} from 'src/features/chat/prompts';
 
 export interface CitationView {
   position: number;

@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { EmbeddingsService } from '../embeddings/embeddings.service';
+import { EmbeddingsService } from 'src/ai/embeddings/embeddings.service';
 import {
   ChunksRepository,
   type RetrievedChunk,
-} from '../documents/chunks.repository';
+} from 'src/features/documents/chunks.repository';
 
 export interface RetrieveOptions {
   userId: string;

@@ -1,11 +1,11 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { EmbeddingsService } from '../embeddings/embeddings.service';
-import { ChunkingService } from '../ingestion/chunking.service';
-import { TextExtractionService } from '../ingestion/text-extraction.service';
+import { PrismaService } from '../../prisma/prisma.service';
+import { EmbeddingsService } from '../../ai/embeddings/embeddings.service';
+import { ChunkingService } from '../../rag/ingestion/chunking.service';
+import { TextExtractionService } from '../../rag/ingestion/text-extraction.service';
 import { ChunksRepository } from './chunks.repository';
-import { DocumentKind, DocumentStatus } from '../generated/prisma/enums';
-import type { Document } from '../generated/prisma/client';
+import { DocumentKind, DocumentStatus } from '../../generated/prisma/enums';
+import type { Document } from '../../generated/prisma/client';
 
 export interface UploadedFile {
   originalname: string;

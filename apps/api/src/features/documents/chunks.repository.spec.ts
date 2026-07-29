@@ -1,10 +1,10 @@
 import 'dotenv/config';
 import { randomUUID } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import { ChunksRepository } from './chunks.repository';
-import { EMBEDDING_DIMENSIONS } from '../embeddings/embeddings.service';
-import { DocumentKind, DocumentStatus } from '../generated/prisma/enums';
+import { EMBEDDING_DIMENSIONS } from '../../ai/embeddings/embeddings.service';
+import { DocumentKind, DocumentStatus } from '../../generated/prisma/enums';
 
 describe('ChunksRepository', () => {
   let prisma: PrismaService;

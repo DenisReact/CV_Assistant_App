@@ -4,11 +4,11 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { LlmService } from '../llm/llm.service';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { LlmService } from 'src/ai/llm/llm.service';
 import { SessionsService } from '../sessions/sessions.service';
-import { DocumentKind, DocumentStatus } from '../generated/prisma/enums';
-import type { Prisma } from '../generated/prisma/client';
+import { DocumentKind, DocumentStatus } from 'src/generated/prisma/enums';
+import type { Prisma } from 'src/generated/prisma/client';
 import {
   FIT_RESPONSE_SCHEMA,
   FIT_SYSTEM_PROMPT,

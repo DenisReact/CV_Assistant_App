@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { EMBEDDING_DIMENSIONS } from '../embeddings/embeddings.service';
+import { PrismaService } from '../../prisma/prisma.service';
+import { EMBEDDING_DIMENSIONS } from '../../ai/embeddings/embeddings.service';
 
 export interface ChunkRow {
   chunkIndex: number;

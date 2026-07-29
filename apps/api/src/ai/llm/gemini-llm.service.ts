@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenAI, type Schema } from '@google/genai';
-import { withRetry } from '../common/retry';
+import { withRetry } from 'src/common/retry';
 import {
   LlmService,
   type GenerateJsonOptions,

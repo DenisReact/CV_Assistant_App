@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
-import { EmbeddingsModule } from '../embeddings/embeddings.module';
-import { IngestionModule } from '../ingestion/ingestion.module';
+import { EmbeddingsModule } from '../../ai/embeddings/embeddings.module';
+import { IngestionModule } from '../../rag/ingestion/ingestion.module';
 import { ChunksRepository } from './chunks.repository';
 import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';

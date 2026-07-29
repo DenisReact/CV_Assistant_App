@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenAI } from '@google/genai';
-import { withRetry } from '../common/retry';
+import { withRetry } from '../../common/retry';
 import { EMBEDDING_DIMENSIONS, EmbeddingsService } from './embeddings.service';
 
 const DEFAULT_MODEL = 'gemini-embedding-001';
