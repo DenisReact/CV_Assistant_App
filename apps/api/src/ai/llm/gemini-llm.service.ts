@@ -16,6 +16,15 @@ import {
 
 const DEFAULT_MODEL = 'gemini-3.6-flash';
 
+/**
+ * Gemini implementation of {@link LlmService}, and the only file in the API
+ * allowed to know that Gemini is what's behind the port.
+ *
+ * Everything vendor-shaped is confined here: the `model` role name, the
+ * `responseSchema` mechanism for JSON mode, usage-metadata field names, and the
+ * fact that an empty response is a plausible outcome rather than an error.
+ * Callers above see neutral turns in and {@link LlmResult} out.
+ */
 @Injectable()
 export class GeminiLlmService extends LlmService {
   private readonly logger = new Logger(GeminiLlmService.name);
@@ -23,6 +32,12 @@ export class GeminiLlmService extends LlmService {
   private readonly model: string;
   private readonly configured: boolean;
 
+  /**
+   * A missing key is recorded, not thrown on. `GEMINI_API_KEY` is optional at
+   * bootstrap by design (see EnvironmentVariables) so the API still starts for
+   * sign-in, upload and validation work; the failure is raised at the point of
+   * use with a message naming the variable.
+   */
   constructor(config: ConfigService) {
     super();
 
@@ -41,6 +56,12 @@ export class GeminiLlmService extends LlmService {
     return this.call(options);
   }
 
+  /**
+   * `responseSchema` makes malformed JSON very unlikely but not impossible —
+   * a response truncated at `maxOutputTokens` is cut off mid-object and still
+   * arrives as a successful call. Parsing is therefore guarded, and the failure
+   * is reported as a provider problem rather than surfacing a raw SyntaxError.
+   */
   async generateJson<T>(
     options: GenerateJsonOptions<T>,
   ): Promise<LlmJsonResult<T>> {
@@ -65,6 +86,14 @@ export class GeminiLlmService extends LlmService {
     };
   }
 
+  /**
+   * The single path to the provider, so retries, timing and the empty-response
+   * check exist once and cannot drift between text and JSON generation.
+   *
+   * Latency is measured around the retry loop rather than inside it: what
+   * matters to the caller is how long the request took, not how long the last
+   * successful attempt took.
+   */
   private async call(
     options: GenerateOptions,
     schema?: Schema,

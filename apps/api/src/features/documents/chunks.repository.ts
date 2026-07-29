@@ -15,19 +15,53 @@ export interface RetrievedChunk {
   chunkIndex: number;
   content: string;
   tokenCount: number;
+  /** Joined from the parent document so callers can label evidence in one pass. */
   documentTitle: string;
   documentKind: string;
+  /** Cosine similarity in [0, 1], higher is closer. */
   score: number;
 }
 
+/** Keeps the placeholder arithmetic below honest if a column is ever added. */
 const COLUMNS_PER_ROW = 6;
 
+/**
+ * Bounded so a large document cannot build a single statement with tens of
+ * thousands of bind parameters — Postgres caps those at 65535, and the failure
+ * would only appear for the biggest uploads.
+ */
 const INSERT_BATCH_SIZE = 500;
 
+/**
+ * Data access for the `chunks` table — the vector store.
+ *
+ * Raw SQL rather than the Prisma query API throughout, because `vector` is a
+ * pgvector type Prisma has no mapping for: it cannot write the column or use
+ * the `<=>` distance operator that the HNSW index is built on. Isolating that
+ * here keeps hand-written SQL to one file with a typed surface over it.
+ *
+ * Every query is parameterised. The `Unsafe` in the Prisma method names refers
+ * to the SQL string being built at runtime, not to interpolated values — none
+ * of the values below are interpolated.
+ */
 @Injectable()
 export class ChunksRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Replaces a document's chunks wholesale, delete-then-insert in one
+   * transaction.
+   *
+   * Replace rather than upsert because re-ingestion may produce a different
+   * number of chunks: leftover rows from a previous run would stay searchable
+   * and cite text the document no longer contains. The transaction is what
+   * makes the window between delete and insert invisible to a concurrent
+   * search.
+   *
+   * Widths are checked before the transaction opens — pgvector would reject a
+   * wrong-width vector anyway, but mid-insert, after the old chunks are already
+   * gone.
+   */
   async replaceForDocument(
     documentId: string,
     chunks: ChunkRow[],
@@ -72,6 +106,20 @@ export class ChunksRepository {
     });
   }
 
+  /**
+   * Nearest-neighbour search over the user's own chunks.
+   *
+   * The `documents` join is the tenant boundary: ownership lives on the parent
+   * document, so filtering by `user_id` here means a chunk belonging to someone
+   * else cannot be reached even if its vector is the closest match. This is the
+   * only place that guarantee is enforced, and it is enforced in SQL rather
+   * than by filtering results afterwards.
+   *
+   * Ordering uses the raw `<=>` distance so the HNSW index can serve the query;
+   * `score` is the same comparison expressed as similarity for callers. An
+   * explicit empty `documentIds` returns immediately — as SQL it would produce
+   * `= ANY('{}')`, which matches nothing but still pays for a query.
+   */
   async search(params: {
     userId: string;
     embedding: number[];
@@ -116,6 +164,15 @@ export class ChunksRepository {
     );
   }
 
+  /**
+   * The chunks surrounding a given one, for widening a hit back out to its
+   * context.
+   *
+   * `score` is a literal zero: these were fetched by position, not similarity,
+   * and returning a plausible-looking number for them would let a caller sort
+   * or threshold on a value that means nothing. Same tenant join as
+   * {@link search}.
+   */
   async neighbours(
     userId: string,
     documentId: string,
@@ -144,6 +201,12 @@ export class ChunksRepository {
     );
   }
 
+  /**
+   * Formats a vector the way pgvector parses it: `[0.1,0.2,...]`, passed as a
+   * bound string and cast with `::vector` at the call site. There is no driver
+   * type for this, so the format is written by hand — and therefore in exactly
+   * one place.
+   */
   private toVectorLiteral(embedding: number[]): string {
     return `[${embedding.join(',')}]`;
   }

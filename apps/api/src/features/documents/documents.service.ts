@@ -1,7 +1,13 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EmbeddingsService } from '../../ai/embeddings/embeddings.service';
 import { ChunkingService } from '../../rag/ingestion/chunking.service';
+import { DocumentClassifierService } from '../../rag/ingestion/document-classifier.service';
 import { TextExtractionService } from '../../rag/ingestion/text-extraction.service';
 import { ChunksRepository } from './chunks.repository';
 import { DocumentKind, DocumentStatus } from '../../generated/prisma/enums';
@@ -21,6 +27,7 @@ export class DocumentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly extraction: TextExtractionService,
+    private readonly classifier: DocumentClassifierService,
     private readonly chunking: ChunkingService,
     private readonly embeddings: EmbeddingsService,
     private readonly chunks: ChunksRepository,
@@ -37,6 +44,20 @@ export class DocumentsService {
       file.mimetype,
       file.originalname,
     );
+
+    // Checked here rather than in the background pass: it costs nothing, and a
+    // wrong file is the user's mistake to fix now — not a FAILED row they find
+    // later. Nothing is stored or embedded until the text looks like the kind
+    // they declared.
+    const { problem, resume, job } = this.classifier.classify(rawText, kind);
+
+    if (problem) {
+      this.logger.warn(
+        `Rejected "${file.originalname}" as ${kind} (resume=${resume} job=${job})`,
+      );
+
+      throw new UnprocessableEntityException(problem);
+    }
 
     const document = await this.prisma.document.create({
       data: {

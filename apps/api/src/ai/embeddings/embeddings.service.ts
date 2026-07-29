@@ -20,9 +20,20 @@ export const EMBEDDING_DIMENSIONS = 768;
  * do not error, they just return worse neighbours.
  */
 export abstract class EmbeddingsService {
+  /**
+   * Recorded on every chunk at insert time, so a later model change can find
+   * and re-embed the stale rows instead of silently comparing incompatible
+   * vectors.
+   */
   abstract get modelName(): string;
 
+  /**
+   * Embeds chunk text for storage. Returns one vector per input, in the same
+   * order — ingestion zips the results back onto the chunks positionally, so a
+   * reordered or short result would corrupt the index without erroring.
+   */
   abstract embedDocuments(texts: string[]): Promise<number[][]>;
 
+  /** Embeds a search query, which providers optimise differently to documents. */
   abstract embedQuery(text: string): Promise<number[]>;
 }

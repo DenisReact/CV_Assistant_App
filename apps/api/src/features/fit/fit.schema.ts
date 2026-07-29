@@ -26,6 +26,13 @@ export interface FitBreakdown {
   interviewTalkingPoints: string[];
 }
 
+/**
+ * A closed set, enforced as an enum in the schema below.
+ *
+ * Letting the model choose its own dimensions would make every analysis a
+ * different shape — not comparable across jobs, and impossible to render as a
+ * fixed dashboard. These four are what a candidate can actually act on.
+ */
 export const FIT_DIMENSIONS = [
   'Technical skills',
   'Experience level',
@@ -33,6 +40,15 @@ export const FIT_DIMENSIONS = [
   'Responsibilities overlap',
 ] as const;
 
+/**
+ * The response contract, enforced by the provider rather than requested in
+ * prose. Asking for JSON in a prompt yields JSON most of the time; a schema
+ * yields it every time, with the required fields present.
+ *
+ * The `description` on each field is doing prompt work, not documentation work:
+ * it is the only instruction the model gets about what belongs in that field,
+ * which is why they read as directives.
+ */
 export const FIT_RESPONSE_SCHEMA: Schema = {
   type: Type.OBJECT,
   required: [
@@ -118,6 +134,18 @@ Rules:
 - Weight gaps by what the posting itself emphasises: something listed as a hard requirement is CRITICAL, something under "nice to have" is not.
 - Keep the overall score consistent with the dimension scores; it should read as a considered summary of them, not an average.`;
 
+/**
+ * The second half of the guarantee the schema starts.
+ *
+ * A schema fixes the shape but not the values: `INTEGER` admits 150 and -4 as
+ * readily as 80, and a model asked for 0-100 does occasionally return a
+ * percentage-of-something-else. Arrays declared without `required` can also
+ * come back absent rather than empty.
+ *
+ * Scores are clamped rather than rejected, and missing arrays defaulted, so one
+ * out-of-range number does not throw away an otherwise sound analysis. The
+ * effect is that whatever reaches the database and the dashboard is renderable.
+ */
 export function validateFitBreakdown(value: unknown): FitBreakdown {
   const raw = value as FitBreakdown;
 

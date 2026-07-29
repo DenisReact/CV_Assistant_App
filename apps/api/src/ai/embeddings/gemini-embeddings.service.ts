@@ -16,6 +16,19 @@ const DEFAULT_MODEL = 'gemini-embedding-001';
  */
 const BATCH_SIZE = 32;
 
+/**
+ * Gemini implementation of {@link EmbeddingsService}.
+ *
+ * `gemini-embedding-001` supports Matryoshka truncation, so it is asked for
+ * {@link EMBEDDING_DIMENSIONS} directly rather than the model's native width.
+ * Truncated vectors are no longer unit length, and pgvector's cosine operator
+ * assumes they are — hence the explicit re-normalisation, which is the one
+ * piece of maths in this class that is not optional.
+ *
+ * Everything the provider could get wrong is checked here rather than trusted
+ * downstream: a short batch, a wrong-width vector, or a zero vector would each
+ * degrade retrieval quietly instead of failing.
+ */
 @Injectable()
 export class GeminiEmbeddingsService extends EmbeddingsService {
   private readonly logger = new Logger(GeminiEmbeddingsService.name);
@@ -54,6 +67,16 @@ export class GeminiEmbeddingsService extends EmbeddingsService {
     return embedding;
   }
 
+  /**
+   * `taskType` is why the two public entry points are separate: the same text
+   * embedded as a document and as a query lands in different places, and the
+   * model is told which side of the comparison it is producing. Getting this
+   * backwards costs retrieval quality with no visible error.
+   *
+   * Batches run sequentially rather than in parallel — the free tier rate-limits
+   * per minute, and firing every batch at once turns a large upload into a wall
+   * of 429s that the retry policy then has to unwind.
+   */
   private async embedAll(
     texts: string[],
     taskType: 'RETRIEVAL_DOCUMENT' | 'RETRIEVAL_QUERY',
@@ -78,6 +101,11 @@ export class GeminiEmbeddingsService extends EmbeddingsService {
     return results;
   }
 
+  /**
+   * The count check matters more than it looks: results are matched to their
+   * inputs by index, so a provider that quietly drops one input would shift
+   * every subsequent vector onto the wrong chunk.
+   */
   private async embedBatch(
     batch: string[],
     taskType: string,
@@ -116,6 +144,13 @@ export class GeminiEmbeddingsService extends EmbeddingsService {
     });
   }
 
+  /**
+   * Scales to unit length, restoring the invariant truncation broke.
+   *
+   * A zero vector is rejected rather than passed through: it cannot be
+   * normalised, and pgvector would return NaN distances for it, which sort
+   * unpredictably instead of simply ranking last.
+   */
   private normalise(values: number[]): number[] {
     const magnitude = Math.sqrt(values.reduce((sum, v) => sum + v * v, 0));
 

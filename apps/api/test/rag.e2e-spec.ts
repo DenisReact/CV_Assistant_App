@@ -103,11 +103,41 @@ const fakeLlm: Pick<LlmService, 'modelName' | 'generate' | 'generateJson'> = {
     }),
 };
 
-const RESUME_TEXT =
-  'Eight years of Kubernetes and Terraform experience, running production observability for payments infrastructure at scale. Led migrations, owned on-call.';
+/*
+ * Shaped like real documents, not just keyword soup: the ingest path runs the
+ * structural classifier, which rejects text that reads like neither a resume
+ * nor a posting. Both mention Kubernetes/Terraform/observability/payments so
+ * the fake embeddings still put them above the retrieval floor for the
+ * question asked below.
+ */
+const RESUME_TEXT = `Dana Reyes
+Platform Engineer — dana.reyes@example.test
 
-const JOB_TEXT =
-  'We need a platform engineer with Kubernetes, Terraform and observability skills for our payments team. Requirements include production on-call ownership.';
+SUMMARY
+Eight years building payments infrastructure at scale.
+
+EXPERIENCE
+Senior Platform Engineer, Northwind (2019 - present)
+Ran Kubernetes clusters and Terraform pipelines for payments services.
+Owned production observability and the on-call rotation.
+
+EDUCATION
+BSc Computer Science, 2016`;
+
+const JOB_TEXT = `Platform Engineer — Payments
+
+ABOUT US
+We are looking for a platform engineer to join our team.
+
+RESPONSIBILITIES
+You will run Kubernetes infrastructure and Terraform automation.
+You will own production observability for payments services.
+
+REQUIREMENTS
+Five years of relevant experience. On-call ownership.
+
+WHAT WE OFFER
+Competitive salary and remote work.`;
 
 describe('RAG flow (e2e, fake AI adapters)', () => {
   let app: INestApplication<App>;
@@ -223,6 +253,45 @@ describe('RAG flow (e2e, fake AI adapters)', () => {
     expect(body.every((d) => d.chunkCount > 0)).toBe(true);
   });
 
+  it('rejects a document that is not the kind it was declared as', async () => {
+    const response = await agent()
+      .post('/documents')
+      .set('x-user-email', email)
+      .field('kind', 'RESUME')
+      .attach('file', Buffer.from(JOB_TEXT), {
+        filename: 'posting.txt',
+        contentType: 'text/plain',
+      })
+      .expect(422);
+
+    expect((response.body as { message: string }).message).toMatch(
+      /looks like a job description/i,
+    );
+  });
+
+  it('rejects a file that is neither a resume nor a posting', async () => {
+    await agent()
+      .post('/documents')
+      .set('x-user-email', email)
+      .field('kind', 'RESUME')
+      .attach(
+        'file',
+        Buffer.from('Opening balance 1,204.55 EUR. Card purchase 42.10.'),
+        {
+          filename: 'statement.txt',
+          contentType: 'text/plain',
+        },
+      )
+      .expect(422);
+
+    const list = await agent()
+      .get('/documents')
+      .set('x-user-email', email)
+      .expect(200);
+
+    expect(list.body).toHaveLength(2);
+  });
+
   it('creates a session pairing the resume with the job as Job #1', async () => {
     const response = await agent()
       .post('/sessions')
@@ -259,8 +328,6 @@ describe('RAG flow (e2e, fake AI adapters)', () => {
     expect(body.role).toBe('ASSISTANT');
     expect(body.content).toBe(CANNED_ANSWER);
     expect(body.model).toBe('fake-llm');
-    // Retrieval was real: the fake embeddings put the overlapping documents
-    // above the relevance floor, and the citations record it.
     expect(body.citations.length).toBeGreaterThan(0);
     expect(body.citations.every((c) => c.score > 0.35)).toBe(true);
   });

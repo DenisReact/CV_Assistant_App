@@ -4,10 +4,23 @@ generator client {
   output = "../src/generated/prisma"
 }
 
+/// Postgres is the only stateful service: relational data, chat history and the
+/// embedding vectors all live here. Keeping vectors alongside their documents
+/// is what makes chunk writes transactional with the document status they
+/// belong to, and tenant isolation a foreign key rather than a convention.
+///
+/// The `vector` type and its HNSW index cannot be expressed in this schema —
+/// see `Chunk.embedding` and the hand-written sections of the init migration.
 datasource db {
   provider = "postgresql"
 }
 
+/// The tenant. Everything else in this schema reaches a user through a chain of
+/// foreign keys, which is what every ownership check ultimately resolves to.
+///
+/// Email is the identity, with no credential stored against it: sign-in is
+/// deliberately identification rather than authentication. Replacing that means
+/// adding columns here, not restructuring anything below.
 model User {
   id    String @id @default(uuid()) @db.Uuid
   email String @unique
@@ -20,6 +33,10 @@ model User {
   @@map("users")
 }
 
+/// Which side of the comparison a document is. Stored rather than inferred: the
+/// distinction drives retrieval scoping, prompt labelling and fit analysis, and
+/// re-deriving it per query would be both slow and less reliable than the user
+/// telling us once at upload.
 enum DocumentKind {
   RESUME
   JOB_DESCRIPTION
@@ -27,6 +44,14 @@ enum DocumentKind {
   @@map("document_kind")
 }
 
+/// Ingestion state. Explicit rather than a nullable timestamp or a boolean,
+/// because the states differ in what the UI should do: PENDING and PROCESSING
+/// mean keep polling, READY means searchable, FAILED means show the error and
+/// offer a retry.
+///
+/// Uploads return as soon as the text is extracted and embedding continues in
+/// the background, so a document is visible before it is searchable — this
+/// column is what makes that gap legible instead of looking like data loss.
 enum DocumentStatus {
   PENDING
   PROCESSING
@@ -37,6 +62,9 @@ enum DocumentStatus {
 }
 
 /// An uploaded resume or job description, plus its ingestion state.
+///
+/// The unit of ownership: chunks, sessions and analyses all establish who may
+/// read them by walking back to this row's `user_id`.
 model Document {
   id String @id @default(uuid()) @db.Uuid
 
@@ -46,14 +74,25 @@ model Document {
   kind  DocumentKind
   title String
 
+  /// Extracted text, kept after chunking rather than discarded. Fit analysis
+  /// needs whole documents, re-chunking with different parameters must not
+  /// require the user to re-upload, and the original file is not retained —
+  /// so this is the source of truth for the document's content.
   rawText String @map("raw_text")
 
   status DocumentStatus @default(PENDING)
 
+  /// Why ingestion failed, in terms the user can act on. Persisted because the
+  /// failure happens in the background, long after the request that caused it
+  /// has returned and any HTTP error could have been shown.
   error String?
 
+  /// Denormalised from `chunks` so the document list can show progress without
+  /// a count per row. Reset on reprocess, and 0 whenever status is not READY.
   chunkCount Int @default(0) @map("chunk_count")
 
+  /// Provenance for the UI, and the only trace of the upload itself — files are
+  /// not stored, only the text extracted from them.
   sourceFilename String? @map("source_filename")
   byteSize       Int?    @map("byte_size")
 
@@ -67,21 +106,40 @@ model Document {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  /// Matches the queries the app actually makes: "this user's job descriptions",
+  /// "this user's documents that are READY". Leading with `userId` is what makes
+  /// it usable for both.
   @@index([userId, kind, status])
   @@map("documents")
 }
 
+/// A passage of a document and its embedding — the retrieval unit.
+///
+/// Search returns these, citations point at them, and the `[n]` markers in an
+/// answer resolve to them. A chunk is therefore the smallest thing the app can
+/// show a user as evidence.
 model Chunk {
   id         String   @id @default(uuid()) @db.Uuid
   documentId String   @map("document_id") @db.Uuid
   document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
+  /// Position within the document. Gives chunks a stable order for neighbour
+  /// lookups, and makes the unique constraint below possible.
   chunkIndex Int @map("chunk_index")
 
   content String
 
+  /// Estimated at ~4 chars/token. Stored so retrieval can apply its context
+  /// budget from the index alone, without re-measuring text it has not read yet.
   tokenCount Int @map("token_count")
 
+  /// The embedding. `Unsupported` because Prisma has no pgvector mapping — it
+  /// creates and preserves the column but cannot read or write it, so all
+  /// access goes through raw SQL in ChunksRepository.
+  ///
+  /// The width is fixed here and in EMBEDDING_DIMENSIONS; changing it needs a
+  /// migration and a full re-embed. Nullable so a row can exist before its
+  /// vector does, though ingestion writes both together and search skips nulls.
   embedding Unsupported("vector(768)")?
 
   /// Which model produced `embedding`. Cosine similarity across two different
@@ -93,11 +151,15 @@ model Chunk {
 
   createdAt DateTime @default(now()) @map("created_at")
 
+  /// Re-ingestion replaces a document's chunks wholesale; this is what stops a
+  /// partially-failed run from leaving two chunks claiming the same position.
   @@unique([documentId, chunkIndex])
   @@index([documentId])
   @@map("chunks")
 }
 
+/// Provider-neutral roles. Adapters translate to whatever the current model
+/// calls them, so a provider swap does not rewrite stored history.
 enum MessageRole {
   USER
   ASSISTANT
@@ -105,12 +167,23 @@ enum MessageRole {
   @@map("message_role")
 }
 
+/// A conversation, and the unit of context: one resume plus the jobs being
+/// compared against it.
+///
+/// Sessions exist so retrieval has a scope narrower than "everything this user
+/// ever uploaded". Without one, a question about a current application would
+/// search last year's résumé drafts and unrelated postings alongside it.
 model ChatSession {
   id String @id @default(uuid()) @db.Uuid
 
   userId String @map("user_id") @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  /// Exactly one resume per session — the fixed side of every comparison.
+  ///
+  /// `SetNull` rather than `Cascade`: deleting a resume should not delete the
+  /// conversation about it. The session survives with its history intact and
+  /// answers that the resume is no longer attached.
   resumeId String?   @map("resume_id") @db.Uuid
   resume   Document? @relation("SessionResume", fields: [resumeId], references: [id], onDelete: SetNull)
 
@@ -120,13 +193,19 @@ model ChatSession {
   messages Message[]
 
   createdAt DateTime @default(now()) @map("created_at")
+  /// Bumped when a message is added, not only on column changes, so "recent"
+  /// in the session list means recently *used*.
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([userId, updatedAt])
   @@map("chat_sessions")
 }
 
-/// A job description in scope for a session.
+/// A job description in scope for a session, and the label the user knows it by.
+///
+/// The join table carries `label`, which is the point: "Job #2" is a fact about
+/// this document *in this session*, not about the document. The same posting
+/// compared in two sessions can legitimately be #2 in one and #1 in the other.
 model ChatSessionJob {
   sessionId String      @map("session_id") @db.Uuid
   session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
@@ -134,15 +213,23 @@ model ChatSessionJob {
   documentId String   @map("document_id") @db.Uuid
   document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
+  /// The number in "Job #N". Stored rather than derived from insertion order,
+  /// because the label appears in prompts, in retrieval scoping and in
+  /// citations — a label that shifted when another job was removed would make
+  /// stored answers refer to the wrong role.
   label Int
 
   createdAt DateTime @default(now()) @map("created_at")
 
+  /// Composite key: a document is in a session once. The second constraint is
+  /// the one that matters — labels must be unambiguous within a session, since
+  /// "Job #2" is how the user and the model address a specific document.
   @@id([sessionId, documentId])
   @@unique([sessionId, label])
   @@map("chat_session_jobs")
 }
 
+/// One turn of a conversation, with the cost of producing it.
 model Message {
   id String @id @default(uuid()) @db.Uuid
 
@@ -154,6 +241,13 @@ model Message {
 
   citations Citation[]
 
+  /// Per-message telemetry, persisted rather than only logged: cost and latency
+  /// become queryable per session and per user, which is what per-user budgets
+  /// and quotas would later be enforced against.
+  ///
+  /// Null across all four for user messages and for the canned answers returned
+  /// without calling the model — a null `model` means no generation happened,
+  /// which is a meaningfully different thing from zero tokens.
   model            String?
   promptTokens     Int?    @map("prompt_tokens")
   completionTokens Int?    @map("completion_tokens")
@@ -161,10 +255,17 @@ model Message {
 
   createdAt DateTime @default(now()) @map("created_at")
 
+  /// History is always read as one session in chronological order.
   @@index([sessionId, createdAt])
   @@map("messages")
 }
 
+/// The link between a claim and its evidence: which chunk backed which answer.
+///
+/// This is what makes citations verifiable rather than decorative. It also
+/// preserves the retrieval outcome for every answer ever given, so quality can
+/// be audited from real traffic instead of by re-running queries against an
+/// index that has since changed.
 model Citation {
   messageId String  @map("message_id") @db.Uuid
   message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
@@ -172,13 +273,24 @@ model Citation {
   chunkId String @map("chunk_id") @db.Uuid
   chunk   Chunk  @relation(fields: [chunkId], references: [id], onDelete: Cascade)
 
+  /// Position in the evidence list, and therefore the `[n]` the answer text
+  /// refers to. Without it the markers in a stored message could not be
+  /// resolved back to chunks on re-read.
   rank  Int
+
+  /// The similarity at retrieval time. Frozen here on purpose — it records how
+  /// confident the match *was*, which re-running the search later would not
+  /// reproduce.
   score Float
 
   @@id([messageId, chunkId])
   @@map("citations")
 }
 
+/// A cached fit analysis for one (resume, job) pair.
+///
+/// Not tied to a session: the same two documents produce the same analysis
+/// wherever they are compared, so the cache is keyed on the pair and shared.
 model FitAnalysis {
   id String @id @default(uuid()) @db.Uuid
 
@@ -188,15 +300,31 @@ model FitAnalysis {
   jobId String   @map("job_id") @db.Uuid
   job   Document @relation("FitJob", fields: [jobId], references: [id], onDelete: Cascade)
 
+  /// Promoted out of `breakdown` into its own column so the dashboard can sort
+  /// and compare jobs without deserialising every analysis. Validated into
+  /// 0-100 before it lands here.
   overallScore Int @map("overall_score")
 
+  /// The full FitBreakdown: dimension scores, matched skills, gaps, talking
+  /// points. Json rather than five more tables because it is written and read
+  /// whole, never queried into — normalising it would buy nothing and cost a
+  /// migration every time the analysis shape is tuned.
+  ///
+  /// Shape is enforced twice before it gets here: by the provider's response
+  /// schema, then by validateFitBreakdown.
   breakdown Json
 
+  /// Which model produced the analysis. Scores from different models are not
+  /// comparable, so a stored one needs to say where it came from.
   model String
 
   createdAt DateTime @default(now()) @map("created_at")
+  /// When the analysis was last recomputed — surfaced as "computed at", since
+  /// a cached verdict should say how old it is.
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  /// One analysis per pair, and the upsert target that makes refresh replace
+  /// rather than accumulate.
   @@unique([resumeId, jobId])
   @@map("fit_analyses")
 }

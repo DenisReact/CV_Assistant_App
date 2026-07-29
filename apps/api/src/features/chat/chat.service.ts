@@ -39,10 +39,24 @@ export interface MessageView {
   createdAt: Date;
 }
 
+/**
+ * Turns of history sent to the model and used for query rewriting. Enough to
+ * resolve "the second one" against what was just discussed, bounded so a long
+ * session cannot grow the prompt until it crowds out the retrieved evidence.
+ */
 const HISTORY_WINDOW = 10;
 
+/** How much of a cited chunk the UI shows; the full chunk stays in the database. */
 const EXCERPT_LENGTH = 400;
 
+/**
+ * Orchestrates the query path: rewrite, retrieve, generate, persist.
+ *
+ * The RAG steps themselves belong to {@link RetrievalService} and the LLM port —
+ * what lives here is the sequencing, the two short-circuits that avoid calling
+ * the model when there is nothing to reason over, and the persistence of
+ * answers with the evidence and telemetry behind them.
+ */
 @Injectable()
 export class ChatService {
   private readonly logger = new Logger(ChatService.name);
@@ -95,6 +109,20 @@ export class ChatService {
     }));
   }
 
+  /**
+   * Answers a question against the session's documents.
+   *
+   * History is read *before* the question is persisted, so the rewrite step
+   * sees the conversation as it stood when the question was asked rather than
+   * finding the question already in its own context.
+   *
+   * Both early returns are deliberate: with no documents, or with nothing above
+   * the relevance floor, a canned answer is stored without calling the model at
+   * all. There is no evidence in either case, so a generated answer could only
+   * be invention — and this way it costs nothing. Both are recorded as real
+   * messages with no citations, which keeps the transcript honest about what
+   * was asked and what came back.
+   */
   async ask(
     userId: string,
     sessionId: string,
@@ -144,6 +172,18 @@ export class ChatService {
     });
   }
 
+  /**
+   * Rewrites a follow-up into a question that stands on its own, for retrieval.
+   *
+   * Only the rewritten form is used to search; the model still answers the
+   * user's original wording, so a rewrite that shifts the emphasis slightly
+   * cannot change what the user sees being answered.
+   *
+   * A failure here degrades to the raw question rather than failing the
+   * request. Searching with "what about the second one?" retrieves poorly, but
+   * an error page for a question the user can see is answerable is worse — and
+   * this is an auxiliary call, not the one they asked for.
+   */
   private async standaloneQuestion(
     question: string,
     priorTurns: LlmTurn[],
@@ -205,6 +245,18 @@ export class ChatService {
     });
   }
 
+  /**
+   * Stores the answer together with the evidence and the cost of producing it.
+   *
+   * Citations keep the rank and score retrieval assigned, so an answer stays
+   * auditable after the fact: what was retrieved, how confident the match was,
+   * and which chunk each `[n]` marker refers to. That is also the only way to
+   * evaluate retrieval quality on real traffic rather than by re-running
+   * queries and hoping the index has not changed.
+   *
+   * Telemetry is absent for the canned answers, which is the intended
+   * distinction — a null model means no generation happened.
+   */
   private async persistAnswer(
     sessionId: string,
     content: string,

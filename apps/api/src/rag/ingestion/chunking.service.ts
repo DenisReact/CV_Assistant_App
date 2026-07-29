@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 
 export interface TextChunk {
+  /** Position in the document, and the ordering key for neighbour lookups. */
   chunkIndex: number;
   content: string;
+  /** Estimated, not exact — see {@link ChunkingService.estimateTokens}. */
   tokenCount: number;
 }
 
@@ -11,14 +13,50 @@ export interface ChunkOptions {
   overlapTokens?: number;
 }
 
+/**
+ * Roughly one resume section or one requirements block. Small enough that a
+ * retrieved chunk is mostly about one thing, large enough that a bullet keeps
+ * the heading it belongs under.
+ */
 const DEFAULT_TARGET_TOKENS = 300;
 
+/**
+ * Carried from the end of each chunk into the next, so a fact split across a
+ * boundary is still wholly present in one of them. Retrieval matches whole
+ * chunks; a sentence cut in half can end up findable in neither.
+ */
 const DEFAULT_OVERLAP_TOKENS = 60;
 
+/**
+ * A paragraph is only broken up when it alone exceeds the target by this much.
+ * Mild overshoot is preferable to splitting mid-thought, so the target behaves
+ * as a goal for packing and this as the actual hard limit.
+ */
 const HARD_SPLIT_MULTIPLIER = 1.5;
 
+/**
+ * Splits extracted document text into embeddable chunks, paragraph-first with a
+ * sentence-level fallback.
+ *
+ * The strategy suits the corpus: resumes and job descriptions are already
+ * sectioned into headings, bullets and short paragraphs, so blank lines are
+ * where the semantic boundaries genuinely are. A fixed-width sliding window
+ * would cut through them arbitrarily and produce chunks that straddle two
+ * unrelated roles.
+ *
+ * Pure and synchronous by design — no I/O, no provider calls — which is what
+ * makes boundary behaviour cheap to test directly.
+ */
 @Injectable()
 export class ChunkingService {
+  /**
+   * Packs whole units into chunks up to `targetTokens`, carrying `overlapTokens`
+   * of trailing context into each successive chunk.
+   *
+   * Returns an empty array for empty or whitespace-only input rather than one
+   * blank chunk; ingestion treats that as a failed document, because embedding
+   * nothing would produce a READY document that can never be retrieved.
+   */
   chunk(text: string, options: ChunkOptions = {}): TextChunk[] {
     const targetTokens = options.targetTokens ?? DEFAULT_TARGET_TOKENS;
     const overlapTokens = options.overlapTokens ?? DEFAULT_OVERLAP_TOKENS;
@@ -73,6 +111,13 @@ export class ChunkingService {
     return chunks;
   }
 
+  /**
+   * Reduces the document to atoms the packer may not split further: paragraphs,
+   * or sentence groups where a paragraph was too long to keep whole.
+   *
+   * Separating this from packing is what keeps the boundary rule in one place —
+   * the packer never has to decide whether it is allowed to break something.
+   */
   private splitIntoUnits(text: string, maxUnitTokens: number): string[] {
     const paragraphs = text
       .split(/\n{2,}/)
@@ -93,6 +138,14 @@ export class ChunkingService {
     return units;
   }
 
+  /**
+   * Fallback for the paragraph a document never announces: a whole resume
+   * pasted as one block, or a PDF whose extraction lost its blank lines.
+   *
+   * Splits on sentence ends *and* single newlines, because the common case here
+   * is a run of bullet points that carry no terminating punctuation — on
+   * sentence boundaries alone they would remain one indivisible unit.
+   */
   private splitLongParagraph(
     paragraph: string,
     maxUnitTokens: number,
@@ -126,6 +179,15 @@ export class ChunkingService {
     return parts;
   }
 
+  /**
+   * The trailing units of a completed chunk, up to `overlapTokens`, to seed the
+   * next one. Whole units only — an overlap that reproduced half a sentence
+   * would give the embedder a fragment to represent.
+   *
+   * The `units.length - 1` guard is the termination condition, not a detail:
+   * if the carry could take every unit, the next chunk would begin exactly
+   * where this one did and the loop would never advance through the document.
+   */
   private tail(units: string[], overlapTokens: number): string[] {
     if (overlapTokens <= 0) {
       return [];
@@ -151,6 +213,16 @@ export class ChunkingService {
     return carry;
   }
 
+  /**
+   * Approximates tokens at ~4 characters each.
+   *
+   * Every consumer of this number is a budget — chunk size, context window
+   * packing — where being within a few percent is enough and being wrong is
+   * self-correcting. Nothing here is billed or capped on it, so the accuracy
+   * does not justify shipping a tokenizer and pinning it to the provider's.
+   *
+   * Floors at 1 so a non-empty unit never measures as free.
+   */
   estimateTokens(text: string): number {
     return Math.max(1, Math.ceil(text.length / 4));
   }

@@ -38,8 +38,27 @@ export interface SessionFitView {
   }[];
 }
 
+/**
+ * Truncation guard for a pathological upload, not a routine budget — a resume
+ * or posting this long is an outlier. Generous enough that normal documents are
+ * never cut, since a truncated resume silently becomes a resume with gaps the
+ * candidate does not have.
+ */
 const MAX_DOCUMENT_CHARS = 24000;
 
+/**
+ * Scores a resume against a job description as structured data.
+ *
+ * Deliberately does **not** use retrieval, unlike chat. "How well does this
+ * resume fit this posting?" is a question about both documents in full: a gap
+ * is something the posting asks for that appears *nowhere* in the resume, and
+ * nearest-chunk retrieval cannot establish absence — it returns the closest
+ * match to a skill whether or not the skill is there. Both documents are small
+ * enough to send whole, so they are.
+ *
+ * That is the general principle here: RAG where the corpus exceeds the context
+ * window, whole documents where it does not.
+ */
 @Injectable()
 export class FitService {
   private readonly logger = new Logger(FitService.name);
@@ -50,6 +69,18 @@ export class FitService {
     private readonly sessions: SessionsService,
   ) {}
 
+  /**
+   * Returns the cached analysis for a (resume, job) pair, or computes one.
+   *
+   * Cached by default because the inputs are immutable in practice — neither
+   * document changes after upload — so re-running costs a slow, expensive call
+   * to arrive at the same verdict, and the dashboard would pay it on every
+   * page load. `refresh` exists for when the user wants a second opinion, since
+   * the call is not perfectly deterministic even at low temperature.
+   *
+   * Both documents are loaded, and their kinds checked, before the cache is
+   * consulted: a cache hit must not be a way to read a document you do not own.
+   */
   async analyse(
     userId: string,
     resumeId: string,
@@ -182,6 +213,17 @@ export class FitService {
     };
   }
 
+  /**
+   * Scores the session's resume against every job in it.
+   *
+   * Jobs are scored one at a time, not concurrently: each is a large-context
+   * call, and firing five at once against a rate-limited free tier turns a slow
+   * request into a failed one.
+   *
+   * A job that is not READY is skipped with a warning rather than failing the
+   * batch — its text may be missing or partial, and one document still
+   * processing should not deny the user the analyses that are ready.
+   */
   async analyseSession(
     userId: string,
     sessionId: string,

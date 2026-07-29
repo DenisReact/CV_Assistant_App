@@ -6,6 +6,10 @@ import {
 import * as mammoth from 'mammoth';
 import { PDFParse } from 'pdf-parse';
 
+/**
+ * The accepted upload types, exported so the controller's validation and this
+ * service's dispatch cannot disagree about what is supported.
+ */
 export const SUPPORTED_MIME_TYPES = [
   'application/pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -16,12 +20,32 @@ export const SUPPORTED_MIME_TYPES = [
 const DOCX_MIME =
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
+/**
+ * Below this, extraction effectively failed. The usual cause is a scanned PDF —
+ * a valid file that parses cleanly and yields almost nothing, because its
+ * "text" is an image. Without this check it would ingest, embed and go READY,
+ * then answer every question with "not in your documents".
+ */
 const MIN_USEFUL_CHARS = 50;
 
+/**
+ * Turns an uploaded file into the plain text the rest of the pipeline works on.
+ *
+ * The format-specific libraries stop here: nothing downstream knows or cares
+ * whether a document arrived as PDF, DOCX or Markdown.
+ */
 @Injectable()
 export class TextExtractionService {
   private readonly logger = new Logger(TextExtractionService.name);
 
+  /**
+   * Runs inside the upload request, so an unreadable file is rejected while the
+   * user is still looking at the upload dialog — with a message that says what
+   * to do about it — rather than becoming a FAILED row they discover later.
+   *
+   * @throws UnprocessableEntityException for an unsupported type, or when the
+   * file yields too little text to be usable.
+   */
   async extract(
     buffer: Buffer,
     mimeType: string,
@@ -61,6 +85,11 @@ export class TextExtractionService {
     }
   }
 
+  /**
+   * The parser holds native resources, so it is destroyed in a `finally` — a
+   * malformed PDF throws out of `getText()`, and uploads are the one path where
+   * a leak per bad file would accumulate.
+   */
   private async extractPdf(buffer: Buffer): Promise<string> {
     const parser = new PDFParse({ data: new Uint8Array(buffer) });
 
