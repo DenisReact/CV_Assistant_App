@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client"
+  moduleFormat = "cjs"
+  output = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id    String @id @default(uuid()) @db.Uuid
+  email String @unique
+
+  documents Document[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("users")
+}
+
+enum DocumentKind {
+  RESUME
+  JOB_DESCRIPTION
+
+  @@map("document_kind")
+}
+
+enum DocumentStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+
+  @@map("document_status")
+}
+
+/// An uploaded resume or job description, plus its ingestion state.
+model Document {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  kind  DocumentKind
+  title String
+
+  rawText String @map("raw_text")
+
+  status DocumentStatus @default(PENDING)
+
+  error String?
+
+  chunkCount Int @default(0) @map("chunk_count")
+
+  sourceFilename String? @map("source_filename")
+  byteSize       Int?    @map("byte_size")
+
+  chunks Chunk[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId, kind, status])
+  @@map("documents")
+}
+
+model Chunk {
+  id         String   @id @default(uuid()) @db.Uuid
+  documentId String   @map("document_id") @db.Uuid
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  chunkIndex Int @map("chunk_index")
+
+  content String
+
+  tokenCount Int @map("token_count")
+
+  embedding Unsupported("vector(768)")?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([documentId, chunkIndex])
+  @@index([documentId])
+  @@map("chunks")
+}

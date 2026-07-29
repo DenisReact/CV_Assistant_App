@@ -1,2 +1,7 @@
 packages:
   - "apps/*"
+onlyBuiltDependencies:
+  - prisma
+  - '@prisma/engines'
+  - unrs-resolver
+  - esbuild
